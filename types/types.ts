@@ -12,4 +12,4 @@ type Post = {
     id:number
     authorId:number
 }
-export {User,Post}
+export type {User,Post}
