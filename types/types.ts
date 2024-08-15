@@ -1,15 +1,41 @@
 type User = {
+    avatar:string
+    birthday:string
+    id:string
     name:string
+    email:string
+    tasks:Task[]
+    deletedTask:Task[]
+    cancelledTask:Task[]
     age:number
-    id:number
-    posts:Post[]
+    password:string
+    bin:Bin
 }
-type Post = {
-    content:string
-    createdOn:Date
-    updatedOn:Date
-    likes:number
-    id:number
-    authorId:number
+type Task = {
+    id:string
+    title:string
+    description:string
+    status:Status
+    createdAt:string
+    dueDate:string
+    modifiedAt:string
+    owner:User
+    isDeleted:boolean
+    isCancelled:boolean
+    deletedBy:string
+    remover:User
+    cancelledBy:string
+    canceller:User
+    bin:Bin
 }
-export type {User,Post}
+type Bin = {
+    id:string
+    owner:User
+    tasks:Task[]
+}
+enum Status{
+    DONE,
+    ACCOMPLISHED,
+    PENDING,
+}
+export type {User,Task,Bin}

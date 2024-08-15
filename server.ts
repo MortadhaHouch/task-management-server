@@ -1,8 +1,11 @@
-import { FastifyInstance } from "fastify";
+import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 let cors = require("@fastify/cors")
 const Fastify = require('fastify');
-const fastify:FastifyInstance = Fastify({ logger: true });
+const pino = require('pino')
+const pretty = require('pino-pretty')
+const logger = pino(pretty())
+const fastify:FastifyInstance = Fastify({ logger });
 require("dotenv").config()
 const helmet = require('@fastify/helmet')
 let userRouter = require("./routes/userRouter")
@@ -32,7 +35,7 @@ fastify.register(userRouter,{prefix:"/user"})
 fastify.register(taskRouter,{prefix:"/task"})
 async function main(){
     fastify.listen({
-        port:Number(process.env.PORT)||4000,
+        port:Number(process.env.PORT),
         path:"/"
     })
 }
