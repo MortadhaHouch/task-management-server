@@ -14,24 +14,27 @@ datasource db {
 }
 
 model User {
-  avatar        String
-  birthday      String
-  id            String @id @default(uuid())
-  name          String
-  email         String @unique
-  tasks         Task[]
-  deletedTask   Task[] @relation("deleter")
-  cancelledTask Task[] @relation("canceller")
-  age           Int
-  password      String
-  bin           Bin?
+  avatar            String
+  birthday          String
+  id                String     @id @default(uuid())
+  firstName         String
+  lastName          String
+  email             String     @unique
+  tasks             Task[]
+  deletedTasks      Task[]     @relation("deleter")
+  cancelledTask     Task[]     @relation("canceller")
+  password          String
+  bin               Bin?
+  writtenFeedbacks  Feedback[] @relation("writtenFeedbacks")
+  likedFeedbacks    Feedback[] @relation("likedFeedbacks")
+  dislikedFeedbacks Feedback[] @relation("dislikedFeedbacks")
+  isLoggedIn        Boolean    @default(false)
 }
 
 model Bin {
   id     String @id @unique @default(uuid())
   owner  User   @relation(fields: [userId], references: [id])
   userId String @unique
-  tasks  Task[]
 }
 
 model Task {
@@ -46,12 +49,21 @@ model Task {
   userId      String     @unique
   isDeleted   Boolean    @default(false)
   isCancelled Boolean    @default(false)
+  thumbnail   String?
+  coverImage  String?
   deletedBy   String
   remover     User       @relation("deleter", fields: [deletedBy], references: [id])
   cancelledBy String
   canceller   User       @relation("canceller", fields: [cancelledBy], references: [id])
-  bin         Bin        @relation(fields: [binId], references: [id])
-  binId       String     @unique
+}
+
+model Feedback {
+  content   String
+  id        String @id
+  author    User[] @relation("writtenFeedbacks")
+  likers    User[] @relation("likedFeedbacks")
+  dislikers User[] @relation("dislikedFeedbacks")
+  likes     Int
 }
 
 enum TaskStatus {

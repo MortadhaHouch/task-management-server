@@ -1,103 +1,164 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {PrismaClient} from "@prisma/client";
-import { User } from '../types/types';
-import { log } from 'console';
+import { LoginRequest, LogoutRequest, SignupRequest, User } from '../types/types';
+let {sign,verify} = require("jsonwebtoken")
+let {v4} = require("uuid")
+let bcrypt = require("bcrypt");
 let prisma = new PrismaClient();
+prisma.$use(async (params, next) => {
+	if (params.model === 'User' && params.action === 'create') {
+		const user = params.args.data;
+		// Hash password before saving to the database
+		const salt = await bcrypt.genSalt(10);
+		user.password = await bcrypt.hash(user.password, salt);
+		params.args.data = user;
+	}
+	return next(params);
+});
 async function userRouter(fastify: FastifyInstance) {
-	fastify.get("/",async(req:FastifyRequest,reply:FastifyReply) =>{
-		let users = await prisma.user.findMany({});
-		reply.send({users})
-	})
-	fastify.get("/:id",async(req:FastifyRequest<{
-		Params:{
-			id:string
-		}
-	}>,reply:FastifyReply) =>{
-		let users = await prisma.user.findMany({
-			where:{
-                id:req.params.id,
-            }
-		});
-		reply.send({users})
-	})
-	fastify.post("/create-user",async(req:FastifyRequest<{
+	fastify.post("/login",async(req:FastifyRequest<{
 		Body:{
-			avatar:string
-			birthday:string
-			id:string
-			name:string
-			email:string
-			age:number
-			password:string
-		}
-	}>,reply:FastifyReply) =>{
-		let user = await prisma.user.create({
-			data:{
-				avatar:req.body.avatar,
-				birthday:req.body.birthday,
-				id:req.body.id,
-				name:req.body.name,
-				email:req.body.email,
-				age:req.body.age,
-				password:req.body.password,
-			}
-		})
-		reply.status(201).send({user})
-	})
-	fastify.put("/update-user",async(req:FastifyRequest<{
-		Body:{
-			id:string
-			data:{
-				avatar:string,
-				birthday:string,
-				name:string,
-				email:string,
-				age:number,
-				password:string,
-			}
-		}
+			body:string
+		},
 	}>,reply:FastifyReply) =>{
 		try {
-			let foundUser = await prisma.user.findUnique({
-				where:{
-					id:req.body.id,
-				}
-			})
-			if(!foundUser){
-                reply.code(404).send({message:"user not found"})
-                return
-            }else{
-				let user = await prisma.user.update({
-					where:{
-						id:req.body.id,
-					},
-					data:{
-						avatar:req.body.data.avatar,
-						birthday:req.body.data.birthday,
-						name:req.body.data.name,
-						email:req.body.data.email,
-						age:req.body.data.age,
-						password:req.body.data.avatar,
+			if(!req.headers?.cookie?.includes("jwt_token")){
+				let userCredentials:LoginRequest = verify(req.body.body,process.env.SECRET_KEY??"");
+				if(userCredentials){
+					let foundUser = await prisma.user.findUnique({
+						where:{
+							email:userCredentials.email,
+						}
+					})
+					if(foundUser){
+						let isValidPassword = await bcrypt.compare(userCredentials.password,foundUser.password);
+						if(isValidPassword){
+							let token = sign({
+								email:foundUser.email,
+								firstName:foundUser.firstName,
+								lastName:foundUser.lastName,
+								avatar:foundUser.avatar,
+								birthday:foundUser.birthday,
+								isLoggedIn:foundUser.isLoggedIn,
+								isVerified:true
+							},process.env.SECRET_KEY)
+							reply.code(200).send({ token})
+						}else{
+							let token = sign({password_error:"please verify your password"},process.env.SECRET_KEY);
+							reply.send({ token})
+						}
+					}else{
+						let token = sign({credentials_message:"please verify your credentials"},process.env.SECRET_KEY);
+						reply.code(400).send({token})
 					}
-				})
-				reply.code(200).send(user)
+				}else{
+					let token = sign({credentials_message:"please verify your credentials"},process.env.SECRET_KEY);
+					reply.code(400).send({token})
+				}
+			}else{
+				let token = sign({error:"Error !! You are already logged In"},process.env.SECRET_KEY);
+				reply.code(400).send({token})
 			}
 		} catch (error) {
-			reply.code(404).send({message:"user not found"})
+			console.log(error);
 		}
 	})
-	fastify.delete("/:id",async(req:FastifyRequest<{
-		Params:{
-            id:string
-        }
+	fastify.post("/signup",async(req:FastifyRequest<{
+		Body:{
+			body:string
+		},
+		cookies:{
+			jwt_token:string
+		}
 	}>,reply:FastifyReply) =>{
 		try {
-			let userToDelete = await prisma.user.delete({
-				where:{
-					id:req.params.id,
+			if(!req.headers?.cookie?.includes("jwt_token")){
+				let userCredentials:SignupRequest = verify(req.body.body,process.env.SECRET_KEY??"");
+				if(userCredentials){
+					let user = await prisma.user.findUnique({
+						where:{
+							email:userCredentials.email
+						}
+					})
+					if(user){
+						reply.send({email_message:"user with this email already exists"})
+					}else{
+						let createdUser = await prisma.user.create({
+							data:{
+								firstName:userCredentials.firstName,
+								lastName:userCredentials.lastName,
+								avatar:userCredentials.avatar,
+								email:userCredentials.email,
+								password:userCredentials.password,
+								birthday:userCredentials.birthday,
+								bin:{
+									create:{
+									}
+								}
+							}
+						})
+						let token = sign({
+							email:createdUser.email,
+							firstName:createdUser.firstName,
+							lastName:createdUser.lastName,
+							avatar:createdUser.avatar,
+							birthday:createdUser.birthday,
+							isVerified:true
+						},process.env.SECRET_KEY)
+						reply.code(200).send({ token})
+					}
+				}else{
+					let token = sign({message:"please verify your credentials"},process.env.SECRET_KEY);
+					reply.code(400).send({token})
 				}
-			})
-			reply.send({message:"user deleted"});
+			}else{
+				let token = sign({message:"Error !! You are already logged In"},process.env.SECRET_KEY);
+				reply.code(400).send({token})
+			}
+		} catch (error) {
+			console.log(error);
+		}
+	})
+	fastify.put("/logout",async(req:FastifyRequest<{
+		Body:{
+			body:string
+		}
+	}>,reply:FastifyReply)=>{
+		try {
+			if(req.body.body){
+				let userCredentials:LogoutRequest = verify(req.body.body,process.env.SECRET_KEY??"");
+				if(userCredentials){
+					let foundUser = await prisma.user.findUnique({
+						where:{
+							email:userCredentials.email
+						}
+					})
+					if(foundUser){
+						await prisma.user.update({
+							where:{
+								email:foundUser.email
+							},
+							data:{
+								isLoggedIn:false
+							}
+						})
+						let token = sign({
+							message:"logged out successfully",
+							description:"You have been logged out successfully !! don't forget to visit us in the next time"
+						},process.env.SECRET_KEY);
+						reply.send({token});
+					}else{
+						let token = sign({
+							error:"Please try again",
+							description:"Your logout process has failed because of falsy credentials please try again"
+						},process.env.SECRET_KEY);
+						reply.send({token});
+					}
+				}else{
+					let token = sign({error:"Please try again"},process.env.SECRET_KEY);
+					reply.send({token});
+				}
+			}
 		} catch (error) {
 			console.log(error);
 		}

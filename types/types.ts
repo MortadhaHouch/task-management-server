@@ -38,4 +38,19 @@ enum Status{
     ACCOMPLISHED,
     PENDING,
 }
-export type {User,Task,Bin}
+type SignupRequest = {
+    firstName:string
+    lastName:string
+    avatar:string
+    email:string
+    password:string
+    birthday:string
+}
+type LoginRequest = {
+    email:string
+    password:string
+}
+type LogoutRequest = {
+    email:string
+}
+export type {User,Task,Bin,SignupRequest,LoginRequest,LogoutRequest}
