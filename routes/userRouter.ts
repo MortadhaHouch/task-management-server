@@ -40,6 +40,7 @@ async function userRouter(fastify: FastifyInstance) {
 								avatar:foundUser.avatar,
 								birthday:foundUser.birthday,
 								isLoggedIn:foundUser.isLoggedIn,
+								password:userCredentials.password,
 								isVerified:true
 							},process.env.SECRET_KEY)
 							reply.code(200).send({ token})

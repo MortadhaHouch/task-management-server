@@ -1,3 +1,5 @@
+import { TaskStatus } from "@prisma/client"
+
 type User = {
     avatar:string
     birthday:string
@@ -15,8 +17,10 @@ type Task = {
     id:string
     title:string
     description:string
+    content:string
     status:Status
     createdAt:string
+    startingDate:string
     dueDate:string
     modifiedAt:string
     owner:User
@@ -53,4 +57,14 @@ type LoginRequest = {
 type LogoutRequest = {
     email:string
 }
-export type {User,Task,Bin,SignupRequest,LoginRequest,LogoutRequest}
+type TaskCreationRequest = {
+    title:string
+    description:string
+    status:TaskStatus
+    duesDate:string
+    content:string
+    thumbnail:string
+    coverImage:string
+    deletedBy:string
+}
+export type {User,Task,Bin,SignupRequest,LoginRequest,LogoutRequest,TaskCreationRequest}
