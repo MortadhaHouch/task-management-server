@@ -29,6 +29,7 @@ model User {
   likedFeedbacks    Feedback[] @relation("likedFeedbacks")
   dislikedFeedbacks Feedback[] @relation("dislikedFeedbacks")
   isLoggedIn        Boolean    @default(false)
+  savedTemplates    String[]
 }
 
 model Bin {
