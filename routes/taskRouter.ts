@@ -2,31 +2,47 @@ import { PrismaClient, TaskStatus } from '@prisma/client';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 let {verify,sign} = require("jsonwebtoken");
 let prisma = new PrismaClient();
-require("dotenv").config()
+require("dotenv").config();
+let taskObject = {
+    id:true,
+    title:true,
+    description:true,
+    status:true,
+    createdAt:true,
+    startingDate:true,
+    dueDate:true,
+    modifiedAt:true,
+    isDeleted:true,
+    isCancelled:true,
+}
 async function taskRouter(fastify: FastifyInstance,options:object) {
-    fastify.get('/?p', async (req: FastifyRequest<{
+    fastify.get('/', async (req: FastifyRequest<{
         Querystring:{
             p:string,
         }
     }>, reply: FastifyReply) => {
         try {
             let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
+            let {email} = verify(cookie,process.env.SECRET_KEY);
             if(cookie && cookie.length > 0){
                 let user = await prisma.user.findUnique({
                     where:{
-                        email:verify(cookie,process.env.SECRET_KEY).email
+                        email
                     }
                 })
                 if(user){
                     let allTasks = await prisma.task.findMany({
                         where:{
-                            userId:verify(cookie,process.env.SECRET_KEY).id
+                            userId:user.id
                         }
                     })
                     if(!isNaN(Number(req.query.p))){
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id
+                                userId:user.id
+                            },
+                            select:{
+                                ...taskObject
                             },
                             skip:Number(req.query.p)*10,
                             take:10
@@ -36,7 +52,10 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     }else{
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id
+                                userId:user.id
+                            },
+                            select:{
+                                ...taskObject
                             },
                             skip:0,
                             take:10
@@ -59,7 +78,56 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             console.log(error);
         }
     });
-    fastify.get('/templates/?p', async (req: FastifyRequest<{
+    fastify.get('/overview', async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
+            let {email} = verify(cookie,process.env.SECRET_KEY);
+            if(cookie && cookie.length > 0){
+                let user = await prisma.user.findUnique({
+                    where:{
+                        email
+                    }
+                })
+                if(user){
+                    let allTasks = await prisma.task.findMany({
+                        where:{
+                            userId:user.id
+                        },
+                        select:{
+                            title:true,
+
+                        }
+                    })
+                    let tasks = await prisma.task.findMany({
+                        where:{
+                            userId:user.id
+                        },
+                        select:{
+                            ...taskObject
+                        }
+                    })
+                    let completedTasks = tasks.filter((task)=>task.status == TaskStatus.ACCOMPLISHED);
+                    let cancelledTasks = tasks.filter((task)=>task.isCancelled);
+                    let overdueTasks = tasks.filter((task)=>task.dueDate.toString() < new Date().getTime().toString() && task.status != TaskStatus.ACCOMPLISHED);
+                    let pendingTasks = tasks.filter((task)=>task.dueDate.toString() > new Date().getTime().toString() && task.status != TaskStatus.ACCOMPLISHED);
+                    let token = sign({completedTasks,cancelledTasks,overdueTasks,pendingTasks},process.env.SECRET_KEY);
+                    reply.send({token})
+                }else{
+                    let token = sign({
+                        message:"OOPS !! you're not authorized",
+                        description:"OOPS !! you're not authorized,please consider logging in or creating an account"
+                    },process.env.SECRET_KEY)
+                    reply.code(401).send({token})
+                }
+            }else{
+                let token = sign({message:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
+                reply.code(401).send({token})
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    });
+    fastify.get('/templates', async (req: FastifyRequest<{
         Querystring:{
             p:string,
         }
@@ -108,25 +176,31 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             if(cookie && cookie.length > 0){
                 let user = await prisma.user.findUnique({
                     where:{
-                        id:verify(cookie,process.env.SECRET_KEY).id
+                        email:verify(cookie,process.env.SECRET_KEY).email
                     }
                 })
                 if(user){
                     if(req.params.date){
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id,
+                                userId:user.id,
                                 dueDate:new Date(req.params.date)
-                            }
+                            },
+                            select:{
+                                ...taskObject
+                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
                     }else{
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id,
+                                userId:user.id,
                                 dueDate:new Date(Date.now())
-                            }
+                            },
+                            select:{
+                                ...taskObject
+                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
@@ -153,25 +227,31 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             if(cookie && cookie.length > 0){
                 let user = await prisma.user.findUnique({
                     where:{
-                        id:verify(cookie,process.env.SECRET_KEY).id
+                        email:verify(cookie,process.env.SECRET_KEY).email
                     }
                 })
                 if(user){
                     if(req.params.month){
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id,
+                                userId:user.id,
                                 dueDate:new Date(req.params.month).getMonth().toString()
-                            }
+                            },
+                            select:{
+                                ...taskObject
+                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
                     }else{
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id,
+                                userId:user.id,
                                 dueDate:new Date(Date.now()).getMonth().toString()
-                            }
+                            },
+                            select:{
+                                ...taskObject
+                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
@@ -199,16 +279,19 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             if(cookie && cookie.length > 0){
                 let user = await prisma.user.findUnique({
                     where:{
-                        id:verify(cookie,process.env.SECRET_KEY).id
+                        email:verify(cookie,process.env.SECRET_KEY).email
                     }
                 })
                 if(user){
                     if(req.params.start){
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id,
+                                userId:user.id,
                                 startingDate:new Date(req.params.start).toString()
-                            }
+                            },
+                            select:{
+                                ...taskObject
+                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
@@ -216,9 +299,12 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     if(req.params.end){
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id,
+                                userId:user.id,
                                 dueDate:new Date(req.params.end).toString()
-                            }
+                            },
+                            select:{
+                                ...taskObject
+                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
@@ -226,10 +312,13 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     if(req.params.start && req.params.end){
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id,
+                                userId:user.id,
                                 startingDate:new Date(req.params.start).toString(),
                                 dueDate:new Date(req.params.end).toString()
-                            }
+                            },
+                            select:{
+                                ...taskObject
+                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
@@ -256,25 +345,31 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             if(cookie && cookie.length > 0){
                 let user = await prisma.user.findUnique({
                     where:{
-                        id:verify(cookie,process.env.SECRET_KEY).id
+                        email:verify(cookie,process.env.SECRET_KEY).email
                     }
                 })
                 if(user){
                     if(req.params.year){
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id,
+                                userId:user.id,
                                 dueDate:new Date(req.params.year).getFullYear().toString()
-                            }
+                            },
+                            select:{
+                                ...taskObject
+                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
                     }else{
                         let tasks = await prisma.task.findMany({
                             where:{
-                                userId:verify(cookie,process.env.SECRET_KEY).id,
+                                userId:user.id,
                                 dueDate:new Date(Date.now()).getFullYear().toString()
-                            }
+                            },
+                            select:{
+                                ...taskObject
+                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
@@ -297,13 +392,13 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             if(cookie && cookie.length > 0){
                 let user = await prisma.user.findUnique({
                     where:{
-                        id:verify(cookie,process.env.SECRET_KEY).id
+                        email:verify(cookie,process.env.SECRET_KEY).email
                     }
                 })
                 if(user){
                     let tasks = await prisma.task.findMany({
                         where:{
-                            userId:verify(cookie,process.env.SECRET_KEY).id,
+                            userId:user.id,
                             isDeleted:true
                         }
                     })
@@ -327,15 +422,18 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             if(cookie && cookie.length > 0){
                 let user = await prisma.user.findUnique({
                     where:{
-                        id:verify(cookie,process.env.SECRET_KEY).id
+                        email:verify(cookie,process.env.SECRET_KEY).email
                     }
                 })
                 if(user){
                     let tasks = await prisma.task.findMany({
                         where:{
-                            userId:verify(cookie,process.env.SECRET_KEY).id,
+                            userId:user.id,
                             isCancelled:true
-                        }
+                        },
+                        select:{
+                            ...taskObject
+                        },
                     })
                     let token = sign({tasks},process.env.SECRET_KEY);
                     reply.send({token})
@@ -357,17 +455,20 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             if(cookie && cookie.length > 0){
                 let user = await prisma.user.findUnique({
                     where:{
-                        id:verify(cookie,process.env.SECRET_KEY).id
+                        email:verify(cookie,process.env.SECRET_KEY).email
                     }
                 })
                 if(user){
                     let tasks = await prisma.task.findMany({
                         where:{
-                            userId:verify(cookie,process.env.SECRET_KEY).id,
+                            userId:user.id,
                             dueDate:{
                                 lte:new Date()
                             }
-                        }
+                        },
+                        select:{
+                            ...taskObject
+                        },
                     })
                     let token = sign({tasks},process.env.SECRET_KEY);
                     reply.send({token})
@@ -389,13 +490,13 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             if(cookie && cookie.length > 0){
                 let user = await prisma.user.findUnique({
                     where:{
-                        id:verify(cookie,process.env.SECRET_KEY).id
+                        email:verify(cookie,process.env.SECRET_KEY).email
                     }
                 })
                 if(user){
                     let tasks = await prisma.task.findMany({
                         where:{
-                            userId:verify(cookie,process.env.SECRET_KEY).id,
+                            userId:user.id,
                             startingDate:{
                                 lte:new Date().toString()
                             },
@@ -404,7 +505,10 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                             },
                             isDeleted:false,
                             isCancelled:false,
-                        }
+                        },
+                        select:{
+                            ...taskObject
+                        },
                     })
                     let token = sign({tasks},process.env.SECRET_KEY);
                     reply.send({token})
@@ -428,17 +532,32 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
         try {
             let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
             if(cookie && cookie.length > 0){
-                let task = await prisma.task.findUnique({
+                let user = await prisma.user.findUnique({
                     where:{
-                        userId:verify(cookie,process.env.SECRET_KEY).id,
-                        id:req.params.id
+                        email:verify(cookie,process.env.SECRET_KEY).email
                     }
                 })
-                let token = sign({task},process.env.SECRET_KEY);
-                reply.send({token})
+                if(user){
+                    let task = await prisma.task.findUnique({
+                        where:{
+                            userId:user?.id,
+                            id:req.params.id
+                        },
+                        select:{
+                            ...taskObject
+                        },
+                    })
+                    let token = sign({task},process.env.SECRET_KEY);
+                    reply.send({token})
+                }else{
+
+                }
             }else{
-                let token = sign({message:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
-                reply.code(401).send({token})
+                let token = sign({
+                        task_exists:"Error",
+                        description:"You're not authorized to access this resource"
+                    },process.env.SECRET_KEY);
+                reply.send({token})
             }
         } catch (error) {
             console.log(error);
@@ -467,7 +586,10 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                         where:{
                             title:name,
                             userId:user.id
-                        }
+                        },
+                        select:{
+                            ...taskObject
+                        },
                     })
                     if(task){
                         let token = sign({
