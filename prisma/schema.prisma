@@ -25,7 +25,7 @@ model User {
   cancelledTask     Task[]     @relation("canceller")
   password          String
   bin               Bin?
-  writtenFeedbacks  Feedback[] @relation("writtenFeedbacks")
+  Feedbacks         Feedback[]
   likedFeedbacks    Feedback[] @relation("likedFeedbacks")
   dislikedFeedbacks Feedback[] @relation("dislikedFeedbacks")
   isLoggedIn        Boolean    @default(false)
@@ -65,11 +65,13 @@ model Task {
 
 model Feedback {
   content   String
-  id        String @id
-  author    User[] @relation("writtenFeedbacks")
+  id        String @id @default(uuid())
+  author    User   @relation(fields: [authorId], references: [id])
+  authorId  String
   likers    User[] @relation("likedFeedbacks")
   dislikers User[] @relation("dislikedFeedbacks")
-  likes     Int
+  likes     Int    @default(0)
+  dislikes  Int    @default(0)
 }
 
 enum TaskStatus {
