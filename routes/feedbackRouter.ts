@@ -3,7 +3,7 @@ import { PrismaClient, TaskStatus } from '@prisma/client';
 let prisma = new PrismaClient();
 let {verify,sign} = require("jsonwebtoken");
 require("dotenv").config();
-export default function feedbackRouter(fastify:FastifyInstance,options:object){
+export default function feedbackRouter(fastify:FastifyInstance,options:object,done:any){
     fastify.get("/",async(req:FastifyRequest<{
         Querystring:{
             p:number
@@ -28,7 +28,7 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object){
                             skip:(req.query.p - 1) * 10
                         })
                         let token = sign({feedbacks},process.env.SECRET_KEY)
-                        reply.send({
+                        reply.code(200).send({
                             token
                         })
                     }else{
@@ -38,7 +38,7 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object){
                             },
                         })
                         let token = sign({feedbacks},process.env.SECRET_KEY)
-                        reply.send({
+                        reply.code(200).send({
                             token
                         })
                     }
@@ -257,4 +257,5 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object){
             reply.status(500).send({ error: "Internal Server Error" });
         }
     });
+    done();
 }

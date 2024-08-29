@@ -95,7 +95,6 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                         },
                         select:{
                             title:true,
-
                         }
                     })
                     let tasks = await prisma.task.findMany({
