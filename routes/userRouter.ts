@@ -32,6 +32,14 @@ async function userRouter(fastify: FastifyInstance) {
 					})
 					if(foundUser){
 						let isValidPassword = await bcrypt.compare(userCredentials.password,foundUser.password);
+						await prisma.user.update({
+							where:{
+								email:foundUser.email
+							},
+							data:{
+								isLoggedIn:true
+							}
+						})
 						if(isValidPassword){
 							let token = sign({
 								email:foundUser.email,
@@ -82,7 +90,8 @@ async function userRouter(fastify: FastifyInstance) {
 						}
 					})
 					if(user){
-						reply.send({email_message:"user with this email already exists"})
+						let token = sign({email_error:"user with this email already exists"},process.env.SECRET_KEY);
+						reply.send({token})
 					}else{
 						let createdUser = await prisma.user.create({
 							data:{
@@ -98,6 +107,14 @@ async function userRouter(fastify: FastifyInstance) {
 								}
 							}
 						})
+						await prisma.user.update({
+							where:{
+								email:createdUser.email
+							},
+							data:{
+								isLoggedIn:true
+							}
+						})
 						let token = sign({
 							email:createdUser.email,
 							firstName:createdUser.firstName,
@@ -105,7 +122,7 @@ async function userRouter(fastify: FastifyInstance) {
 							avatar:createdUser.avatar,
 							birthday:createdUser.birthday,
 							isVerified:true
-						},process.env.SECRET_KEY)
+						},process.env.SECRET_KEY);
 						reply.code(200).send({ token})
 					}
 				}else{

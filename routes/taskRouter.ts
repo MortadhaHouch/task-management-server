@@ -65,13 +65,13 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     }
                 }else{
                     let token = sign({
-                        message:"OOPS !! you're not authorized",
+                        error:"OOPS !! you're not authorized",
                         description:"OOPS !! you're not authorized,please consider logging in or creating an account"
                     },process.env.SECRET_KEY)
                     reply.code(401).send({token})
                 }
             }else{
-                let token = sign({message:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
+                let token = sign({error:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
                 reply.code(401).send({token})
             }
         } catch (error) {
@@ -415,7 +415,11 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             console.log(error);
         }
     });
-    fastify.get('/cancelled', async (req: FastifyRequest, reply: FastifyReply) => {
+    fastify.get('/cancelled/:p', async (req: FastifyRequest<{
+        Params:{
+            p:string
+        }
+    }>, reply: FastifyReply) => {
         try {
             let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
             if(cookie && cookie.length > 0){
@@ -425,17 +429,33 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     }
                 })
                 if(user){
-                    let tasks = await prisma.task.findMany({
-                        where:{
-                            userId:user.id,
-                            isCancelled:true
-                        },
-                        select:{
-                            ...taskObject
-                        },
-                    })
-                    let token = sign({tasks},process.env.SECRET_KEY);
-                    reply.send({token})
+                    if(Number(req.params.p)){
+                        let tasks = await prisma.task.findMany({
+                            where:{
+                                userId:user.id,
+                                isCancelled:true
+                            },
+                            select:{
+                                ...taskObject
+                            },
+                            skip:(Number(req.params.p) - 1)*10,
+                            take:10
+                        })
+                        let token = sign({tasks},process.env.SECRET_KEY);
+                        reply.send({token})
+                    }else{
+                        let tasks = await prisma.task.findMany({
+                            where:{
+                                userId:user.id,
+                                isCancelled:true
+                            },
+                            select:{
+                                ...taskObject
+                            },
+                        })
+                        let token = sign({tasks},process.env.SECRET_KEY);
+                        reply.send({token})
+                    }
                 }else{
                     let token = sign({message:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
                     reply.code(401).send({token})
@@ -549,7 +569,11 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     let token = sign({task},process.env.SECRET_KEY);
                     reply.send({token})
                 }else{
-
+                    let token = sign({
+                        task_exists:"Error",
+                        description:"You're not authorized to access this resource"
+                    },process.env.SECRET_KEY);
+                    reply.send({token})
                 }
             }else{
                 let token = sign({

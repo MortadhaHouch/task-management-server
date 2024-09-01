@@ -16,20 +16,21 @@ datasource db {
 model User {
   avatar            String
   birthday          String
-  id                String     @id @default(uuid())
+  id                String         @id @default(uuid())
   firstName         String
   lastName          String
-  email             String     @unique
+  email             String         @unique
   tasks             Task[]
-  deletedTasks      Task[]     @relation("deleter")
-  cancelledTask     Task[]     @relation("canceller")
+  deletedTasks      Task[]         @relation("deleter")
+  cancelledTask     Task[]         @relation("canceller")
   password          String
   bin               Bin?
   Feedbacks         Feedback[]
-  likedFeedbacks    Feedback[] @relation("likedFeedbacks")
-  dislikedFeedbacks Feedback[] @relation("dislikedFeedbacks")
-  isLoggedIn        Boolean    @default(false)
+  likedFeedbacks    Feedback[]     @relation("likedFeedbacks")
+  dislikedFeedbacks Feedback[]     @relation("dislikedFeedbacks")
+  isLoggedIn        Boolean        @default(false)
   savedTemplates    String[]
+  notifications     Notification[]
 }
 
 model Bin {
@@ -72,6 +73,15 @@ model Feedback {
   dislikers User[] @relation("dislikedFeedbacks")
   likes     Int    @default(0)
   dislikes  Int    @default(0)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
 }
 
 enum TaskStatus {
