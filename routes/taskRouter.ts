@@ -14,6 +14,8 @@ let taskObject = {
     modifiedAt:true,
     isDeleted:true,
     isCancelled:true,
+    coverImage:true,
+    thumbnail:true
 }
 async function taskRouter(fastify: FastifyInstance,options:object) {
     fastify.get('/', async (req: FastifyRequest<{
@@ -89,26 +91,23 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     }
                 })
                 if(user){
-                    let allTasks = await prisma.task.findMany({
-                        where:{
-                            userId:user.id
-                        },
-                        select:{
-                            title:true,
-                        }
-                    })
                     let tasks = await prisma.task.findMany({
                         where:{
                             userId:user.id
                         },
                         select:{
-                            ...taskObject
+                            title:true,
+                            isCancelled:true,
+                            isDeleted:true,
+                            status:true,
+                            dueDate:true,
+                            startingDate:true,
                         }
                     })
                     let completedTasks = tasks.filter((task)=>task.status == TaskStatus.ACCOMPLISHED);
                     let cancelledTasks = tasks.filter((task)=>task.isCancelled);
-                    let overdueTasks = tasks.filter((task)=>task.dueDate.toString() < new Date().getTime().toString() && task.status != TaskStatus.ACCOMPLISHED);
-                    let pendingTasks = tasks.filter((task)=>task.dueDate.toString() > new Date().getTime().toString() && task.status != TaskStatus.ACCOMPLISHED);
+                    let overdueTasks = tasks.filter((task)=>task.dueDate.toString() < new Date().getTime().toString() && task.status == TaskStatus.PENDING);
+                    let pendingTasks = tasks.filter((task)=>task.dueDate.toString() > new Date().getTime().toString() && task.status == TaskStatus.PENDING);
                     let token = sign({completedTasks,cancelledTasks,overdueTasks,pendingTasks},process.env.SECRET_KEY);
                     reply.send({token})
                 }else{
@@ -183,7 +182,7 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                         let tasks = await prisma.task.findMany({
                             where:{
                                 userId:user.id,
-                                dueDate:new Date(req.params.date)
+                                dueDate:new Date(req.params.date).getDay().toString()
                             },
                             select:{
                                 ...taskObject
@@ -195,7 +194,7 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                         let tasks = await prisma.task.findMany({
                             where:{
                                 userId:user.id,
-                                dueDate:new Date(Date.now())
+                                dueDate:new Date().getDay().toString()
                             },
                             select:{
                                 ...taskObject
@@ -246,7 +245,7 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                         let tasks = await prisma.task.findMany({
                             where:{
                                 userId:user.id,
-                                dueDate:new Date(Date.now()).getMonth().toString()
+                                dueDate:new Date().getMonth().toString()
                             },
                             select:{
                                 ...taskObject
@@ -364,7 +363,7 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                         let tasks = await prisma.task.findMany({
                             where:{
                                 userId:user.id,
-                                dueDate:new Date(Date.now()).getFullYear().toString()
+                                dueDate:new Date().getFullYear().toString()
                             },
                             select:{
                                 ...taskObject
@@ -482,7 +481,7 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                         where:{
                             userId:user.id,
                             dueDate:{
-                                lte:new Date()
+                                lte:new Date().getDay().toString()
                             }
                         },
                         select:{
@@ -605,7 +604,7 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     }
                 })
                 if(user){
-                    let task = await prisma.task.findUnique({
+                    let task = await prisma.task.findFirst({
                         where:{
                             title:name,
                             userId:user.id
@@ -657,25 +656,36 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     }
                 })
                 if(user){
-                    let {title,description,status,dueDate,content,thumbnail,coverImage,startingDate} = verify(req.body.body,process.env.SECRET_KEY);
-                    let task = await prisma.task.create({
-                        data:{
-                            title,
-                            description,
-                            status,
-                            dueDate,
-                            content,
-                            thumbnail,
-                            coverImage,
-                            userId:user.id,
-                            startingDate,
-                            deletedBy:user.id,
-                            cancelledBy:user.id,
-                            binId:user.id
+                    let taskBody = verify(req.body.body,process.env.SECRET_KEY);
+                    let bin = await prisma.bin.findUnique({
+                        where:{
+                            userId:user.id
                         }
                     })
-                    let token = sign({task},process.env.SECRET_KEY);
-                    reply.code(201).send({token})
+                    if(bin){
+                        let task = await prisma.task.create({
+                            data:{
+                                title:taskBody.title,
+                                description:taskBody.description,
+                                status:TaskStatus.PENDING,
+                                dueDate:taskBody.dueDate,
+                                content:taskBody.content,
+                                thumbnail:taskBody.thumbnail,
+                                coverImage:taskBody.coverImage,
+                                userId:user.id,
+                                startingDate:taskBody.startingDate,
+                                deletedBy:user.id,
+                                cancelledBy:user.id,
+                                binId:bin.id,
+                            }
+                        })
+                        let token = sign({
+                            task,
+                            title:"task created",
+                            description:"Task has been successfully created"
+                        },process.env.SECRET_KEY);
+                        reply.code(201).send({token})
+                    }
                 }else{
                     let token = sign({
                         error:"OOPS!! you are not logged in",
@@ -706,38 +716,51 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                     }
                 })
                 if(user){
-                    let {id,title,description,thumbnail,coverImage,status,dueDate,content,deletedBy} = verify(req.body.body,process.env.SECRET_KEY);
-                    let foundTask = await prisma.task.findUnique({
-                        where:{
-                            id,
-                            userId:user.id,
-                        }
-                    })
-                    if(foundTask){
-                        await prisma.task.update({
+                    let {tasks} = verify(req.body.body,process.env.SECRET_KEY);
+                    let tasksToUpdate:string[] = [];
+                    for (const item of tasks) {
+                        let foundTask = await prisma.task.findUnique({
                             where:{
-                                id:foundTask.id,
-                            },
-                            data:{
+                                id:item.id,
                                 userId:user.id,
-                                title,
-                                description,
-                                thumbnail,
-                                coverImage,
-                                status,
-                                dueDate,
-                                content,
-                                deletedBy,
                             }
                         })
-                        let token = sign({task:foundTask},process.env.SECRET_KEY);
-                        reply.code(200).send({token})
+                        if(foundTask){
+                            let obj = await prisma.task.update({
+                                where:{
+                                    id:foundTask.id,
+                                },
+                                data:{
+                                    title:item.title,
+                                    description:item.description,
+                                    status:item.status,
+                                    dueDate:item.dueDate,
+                                    startingDate:item.startingDate.toString(),
+                                    createdAt:item.createdAt,
+                                    modifiedAt:item.modifiedAt,
+                                    isCancelled:item.isCancelled,
+                                    isDeleted:item.isDeleted,
+                                    thumbnail:item.thumbnail
+                                }
+                            })
+                            if(foundTask.id !== obj.id){
+                                tasksToUpdate.push(obj.id);
+                            }
+                        }
+                    }
+                    if(tasksToUpdate.length == 0){
+                        let token = sign({
+                            message:"Tasks updated successfully",
+                            description:"The tasks you have modified have been successfully updated you can keep moving forward"
+                        },process.env.SECRET_KEY);
+                        reply.code(204).send({token})
                     }else{
                         let token = sign({
-                            error:"OOPS!! you can't update this task",
-                            description:"you are not the owner or admin of this task"
+                            message:"update failure",
+                            description:"OOPS!! something went wrong while updating the tasks, please try again",
+                            tasksToUpdate
                         },process.env.SECRET_KEY);
-                        reply.code(403).send({token})
+                        reply.send({token});
                     }
                 }else{
                     let token = sign({

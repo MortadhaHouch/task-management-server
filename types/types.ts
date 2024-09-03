@@ -31,6 +31,8 @@ type Task = {
     cancelledBy:string
     canceller:User
     bin:Bin
+    thumbnail:string
+    coverImage:string
 }
 type Bin = {
     id:string
@@ -68,3 +70,4 @@ type TaskCreationRequest = {
     deletedBy:string
 }
 export type {User,Task,Bin,SignupRequest,LoginRequest,LogoutRequest,TaskCreationRequest}
+export {Status}
