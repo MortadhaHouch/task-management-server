@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { PrismaClient, TaskStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 let prisma = new PrismaClient();
 let {verify,sign} = require("jsonwebtoken");
 require("dotenv").config();
@@ -38,6 +38,182 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object,do
                 });
                 let token = sign({feedbacks},process.env.SECRET_KEY)
                 reply.code(200).send({token})
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    })
+    fastify.get("/:id",async(req:FastifyRequest<{
+        Params:{
+            id:string
+        }
+    }>,reply:FastifyReply)=>{
+        try {
+            if(req.params.id){
+                let feedback = await prisma.feedback.findUnique({
+                    where:{
+                        id:req.params.id
+                    },
+                    select:{
+                        content:true,
+                        author:{
+                            select:{
+                                email:true,
+                                firstName:true,
+                                lastName:true,
+                                avatar:true,
+                                isLoggedIn:true,
+                                birthday:true,
+                            }
+                        }
+                    }
+                })
+                let token = sign({feedback},process.env.SECRET_KEY)
+                reply.code(200).send({token})
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    })
+    fastify.get("/mine",async(req:FastifyRequest<{
+        Querystring:{
+            p?:string
+        }
+    }>,reply:FastifyReply)=>{
+        try {
+            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
+            if(cookie && cookie.length > 0){
+                let {email} = verify(cookie,process.env.SECRET_KEY);
+                let user = await prisma.user.findUnique({
+                    where:{
+                        email
+                    }
+                })
+                if(user){
+                    if(req.query.p){
+                        let feedbacks = await prisma.feedback.findMany({
+                            where:{
+                                authorId:user.id
+                            },
+                            take:10,
+                            skip:(Number(req.query.p) - 1) * 10,
+                            include:{
+                                author:{
+                                    select:{
+                                        email:true,
+                                        firstName:true,
+                                        lastName:true,
+                                        avatar:true,
+                                        isLoggedIn:true,
+                                        birthday:true,
+                                    }
+                                }
+                            }
+                        })
+                        console.log(feedbacks);
+                        let token = sign({feedbacks},process.env.SECRET_KEY)
+                        reply.code(200).send({token})
+                    }else{
+                        let feedbacks = await prisma.feedback.findMany({
+                            where:{
+                                authorId:user.id
+                            },
+                            include:{
+                                author:{
+                                    select:{
+                                        email:true,
+                                        firstName:true,
+                                        lastName:true,
+                                        avatar:true,
+                                        isLoggedIn:true,
+                                        birthday:true,
+                                    }
+                                }
+                            }
+                        });
+                        console.log(feedbacks);
+                        let token = sign({feedbacks},process.env.SECRET_KEY)
+                        reply.code(200).send({token})
+                    }
+                }else{
+                    let token = sign({error:"OOPS !! you don't have the permission to access this resource"},process.env.SECRET_KEY)
+                    reply.code(401).send({token})
+                }
+            }else{
+                let token = sign({error:"OOPS !! you don't have the permission to access this resource"},process.env.SECRET_KEY)
+                reply.code(401).send({token})
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    })
+    fastify.get("/mine/:p",async(req:FastifyRequest<{
+        Querystring:{
+            p?:string
+        }
+    }>,reply:FastifyReply)=>{
+        try {
+            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
+            if(cookie && cookie.length > 0){
+                let {email} = verify(cookie,process.env.SECRET_KEY);
+                let user = await prisma.user.findUnique({
+                    where:{
+                        email
+                    }
+                })
+                if(user){
+                    if(req.query.p){
+                        let feedbacks = await prisma.feedback.findMany({
+                            where:{
+                                authorId:user.id
+                            },
+                            take:10,
+                            skip:(Number(req.query.p) - 1) * 10,
+                            include:{
+                                author:{
+                                    select:{
+                                        email:true,
+                                        firstName:true,
+                                        lastName:true,
+                                        avatar:true,
+                                        isLoggedIn:true,
+                                        birthday:true,
+                                    }
+                                }
+                            }
+                        })
+                        console.log(feedbacks);
+                        let token = sign({feedbacks},process.env.SECRET_KEY)
+                        reply.code(200).send({token})
+                    }else{
+                        let feedbacks = await prisma.feedback.findMany({
+                            where:{
+                                authorId:user.id
+                            },
+                            include:{
+                                author:{
+                                    select:{
+                                        email:true,
+                                        firstName:true,
+                                        lastName:true,
+                                        avatar:true,
+                                        isLoggedIn:true,
+                                        birthday:true,
+                                    }
+                                }
+                            }
+                        });
+                        console.log(feedbacks);
+                        let token = sign({feedbacks},process.env.SECRET_KEY)
+                        reply.code(200).send({token})
+                    }
+                }else{
+                    let token = sign({error:"OOPS !! you don't have the permission to access this resource"},process.env.SECRET_KEY)
+                    reply.code(401).send({token})
+                }
+            }else{
+                let token = sign({error:"OOPS !! you don't have the permission to access this resource"},process.env.SECRET_KEY)
+                reply.code(401).send({token})
             }
         } catch (error) {
             console.log(error);

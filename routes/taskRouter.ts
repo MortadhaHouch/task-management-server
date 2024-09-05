@@ -1,5 +1,6 @@
 import { PrismaClient, TaskStatus } from '@prisma/client';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { Task } from '../types/types';
 let {verify,sign} = require("jsonwebtoken");
 let prisma = new PrismaClient();
 require("dotenv").config();
@@ -164,6 +165,39 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             console.log(error);
         }
     });
+    fastify.get('/by-day', async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
+            if(cookie && cookie.length > 0){
+                let user = await prisma.user.findUnique({
+                    where:{
+                        email:verify(cookie,process.env.SECRET_KEY).email
+                    }
+                })
+                if(user){
+                    let tasks = await prisma.task.findMany({
+                        where:{
+                            userId:user.id,
+                            dueDate:new Date().getDay().toString()
+                        },
+                        select:{
+                            ...taskObject
+                        },
+                    })
+                    let token = sign({tasks},process.env.SECRET_KEY);
+                    reply.send({token})
+                }else{
+                    let token = sign({message:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
+                    reply.code(401).send({token})
+                }
+            }else{
+                let token = sign({message:"OOPS !! invalid credentials ,Please login or register"},process.env.SECRET_KEY)
+                reply.code(401).send({token})
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    });
     fastify.get('/by-day/:date', async (req: FastifyRequest<{
         Params:{
             date:string
@@ -190,19 +224,40 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
-                    }else{
-                        let tasks = await prisma.task.findMany({
-                            where:{
-                                userId:user.id,
-                                dueDate:new Date().getDay().toString()
-                            },
-                            select:{
-                                ...taskObject
-                            },
-                        })
-                        let token = sign({tasks},process.env.SECRET_KEY);
-                        reply.send({token})
                     }
+                }else{
+                    let token = sign({message:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
+                    reply.code(401).send({token})
+                }
+            }else{
+                let token = sign({message:"OOPS !! invalid credentials ,Please login or register"},process.env.SECRET_KEY)
+                reply.code(401).send({token})
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    });
+    fastify.get('/by-month', async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
+            if(cookie && cookie.length > 0){
+                let user = await prisma.user.findUnique({
+                    where:{
+                        email:verify(cookie,process.env.SECRET_KEY).email
+                    }
+                })
+                if(user){
+                    let tasks = await prisma.task.findMany({
+                        where:{
+                            userId:user.id,
+                            dueDate:new Date().getMonth().toString()
+                        },
+                        select:{
+                            ...taskObject
+                        },
+                    })
+                    let token = sign({tasks},process.env.SECRET_KEY);
+                    reply.send({token})
                 }else{
                     let token = sign({message:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
                     reply.code(401).send({token})
@@ -234,18 +289,6 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                             where:{
                                 userId:user.id,
                                 dueDate:new Date(req.params.month).getMonth().toString()
-                            },
-                            select:{
-                                ...taskObject
-                            },
-                        })
-                        let token = sign({tasks},process.env.SECRET_KEY);
-                        reply.send({token})
-                    }else{
-                        let tasks = await prisma.task.findMany({
-                            where:{
-                                userId:user.id,
-                                dueDate:new Date().getMonth().toString()
                             },
                             select:{
                                 ...taskObject
@@ -333,6 +376,39 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             console.log(error);
         }
     });
+    fastify.get('/by-year', async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
+            if(cookie && cookie.length > 0){
+                let user = await prisma.user.findUnique({
+                    where:{
+                        email:verify(cookie,process.env.SECRET_KEY).email
+                    }
+                })
+                if(user){
+                    let tasks = await prisma.task.findMany({
+                        where:{
+                            userId:user.id,
+                            dueDate:new Date().getFullYear().toString()
+                        },
+                        select:{
+                            ...taskObject
+                        },
+                    })
+                    let token = sign({tasks},process.env.SECRET_KEY);
+                    reply.send({token})
+                }else{
+                    let token = sign({message:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
+                    reply.code(401).send({token})
+                }
+            }else{
+                let token = sign({message:"OOPS !! invalid credentials ,Please login or register"},process.env.SECRET_KEY)
+                reply.code(401).send({token})
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    });
     fastify.get('/by-year/:year', async (req: FastifyRequest<{
         Params:{
             year:string
@@ -352,18 +428,6 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                             where:{
                                 userId:user.id,
                                 dueDate:new Date(req.params.year).getFullYear().toString()
-                            },
-                            select:{
-                                ...taskObject
-                            },
-                        })
-                        let token = sign({tasks},process.env.SECRET_KEY);
-                        reply.send({token})
-                    }else{
-                        let tasks = await prisma.task.findMany({
-                            where:{
-                                userId:user.id,
-                                dueDate:new Date().getFullYear().toString()
                             },
                             select:{
                                 ...taskObject
@@ -414,6 +478,43 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
             console.log(error);
         }
     });
+    fastify.get('/cancelled', async (req: FastifyRequest<{
+        Params:{
+            p:string
+        }
+    }>, reply: FastifyReply) => {
+        try {
+            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
+            if(cookie && cookie.length > 0){
+                let user = await prisma.user.findUnique({
+                    where:{
+                        email:verify(cookie,process.env.SECRET_KEY).email
+                    }
+                })
+                if(user){
+                    let tasks = await prisma.task.findMany({
+                        where:{
+                            userId:user.id,
+                            isCancelled:true
+                        },
+                        select:{
+                            ...taskObject
+                        },
+                    })
+                    let token = sign({tasks},process.env.SECRET_KEY);
+                    reply.send({token})
+                }else{
+                    let token = sign({message:"OOPS !! you're not authorized ,Please login or register"},process.env.SECRET_KEY)
+                    reply.code(401).send({token})
+                }
+            }else{
+                let token = sign({message:"OOPS !! invalid credentials ,Please login or register"},process.env.SECRET_KEY)
+                reply.code(401).send({token})
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    });
     fastify.get('/cancelled/:p', async (req: FastifyRequest<{
         Params:{
             p:string
@@ -439,18 +540,6 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                             },
                             skip:(Number(req.params.p) - 1)*10,
                             take:10
-                        })
-                        let token = sign({tasks},process.env.SECRET_KEY);
-                        reply.send({token})
-                    }else{
-                        let tasks = await prisma.task.findMany({
-                            where:{
-                                userId:user.id,
-                                isCancelled:true
-                            },
-                            select:{
-                                ...taskObject
-                            },
                         })
                         let token = sign({tasks},process.env.SECRET_KEY);
                         reply.send({token})
@@ -731,16 +820,17 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                                     id:foundTask.id,
                                 },
                                 data:{
-                                    title:item.title,
-                                    description:item.description,
-                                    status:item.status,
-                                    dueDate:item.dueDate,
-                                    startingDate:item.startingDate.toString(),
-                                    createdAt:item.createdAt,
-                                    modifiedAt:item.modifiedAt,
-                                    isCancelled:item.isCancelled,
-                                    isDeleted:item.isDeleted,
-                                    thumbnail:item.thumbnail
+                                    title:item.title ?? foundTask.title,
+                                    description:item.description ?? foundTask.description,
+                                    status:item.status ?? foundTask.status,
+                                    dueDate:item.dueDate ?? foundTask.dueDate,
+                                    startingDate:item.startingDate.toString() ?? foundTask.startingDate.toString(),
+                                    createdAt:item.createdAt ?? foundTask.createdAt,
+                                    modifiedAt:item.modifiedAt || foundTask.modifiedAt,
+                                    isCancelled:item.isCancelled ?? foundTask.isCancelled,
+                                    isDeleted:item.isDeleted ?? foundTask.isDeleted,
+                                    thumbnail:item.thumbnail ?? foundTask.thumbnail,
+                                    coverImage:item.coverImage ?? foundTask.coverImage,
                                 }
                             })
                             if(foundTask.id !== obj.id){
@@ -753,10 +843,10 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                             message:"Tasks updated successfully",
                             description:"The tasks you have modified have been successfully updated you can keep moving forward"
                         },process.env.SECRET_KEY);
-                        reply.code(204).send({token})
+                        reply.code(204).send({token});
                     }else{
                         let token = sign({
-                            message:"update failure",
+                            update_failure_message:"update failure",
                             description:"OOPS!! something went wrong while updating the tasks, please try again",
                             tasksToUpdate
                         },process.env.SECRET_KEY);
@@ -893,29 +983,24 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                 })
                 if(user){
                     if(req.params.id && req.params.id.length > 0){
-                        let {id} = verify(req.params.id,process.env.SECRET_KEY);
                         let foundTask = await prisma.task.findUnique({
                             where:{
-                                id,
+                                id:req.params.id,
                                 userId:user.id
                             }
                         })
                         if(foundTask){
-                        await prisma.user.update({
-                            where:{
-                                id:user.id
-                            },
-                            data:{
-                                tasks:{
-                                    delete:{
-                                        id:foundTask.id
-                                    }
+                            await prisma.task.update({
+                                where:{
+                                    id:foundTask.id
+                                },
+                                data:{
+                                    isDeleted:true
                                 }
-                            }
-                        })
-                        let token = sign({message:"task deleted successfully!! you can see it in your bin or recover whenever you want"},process.env.SECRET_KEY);
-                        reply.code(200).send({token});
-                    }
+                            })
+                            let token = sign({message:"task deleted successfully!! you can see it in your bin or recover whenever you want"},process.env.SECRET_KEY);
+                            reply.send({token});
+                        }
                     }else{
                         let token = sign({
                             error:"OOPS!! you can't delete this task",
@@ -961,33 +1046,14 @@ async function taskRouter(fastify: FastifyInstance,options:object) {
                         }
                     })
                     if(foundTask){
-                        let bin = await prisma.bin.findUnique({
+                        await prisma.task.update({
                             where:{
-                                userId:user.id
+                                id:foundTask.id
+                            },
+                            data:{
+                                isDeleted:false
                             }
-                        });
-                        if(bin){
-                            await prisma.bin.update({
-                                where:{
-                                    userId:user.id
-                                },
-                                data:{
-                                    tasks:{
-                                        delete:{
-                                            ...foundTask
-                                        }
-                                    }
-                                }
-                            })
-                            await prisma.task.update({
-                                where:{
-                                    id:foundTask.id
-                                },
-                                data:{
-                                    isDeleted:false
-                                }
-                            })
-                        }
+                        })
                         let token = sign({message:"task recovered successfully!! you can see it in your tasks again"},process.env.SECRET_KEY);
                         reply.code(200).send({token});
                     }
