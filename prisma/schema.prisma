@@ -31,6 +31,7 @@ model User {
   isLoggedIn        Boolean        @default(false)
   savedTemplates    String[]
   notifications     Notification[]
+  comments          Comment[]
 }
 
 model Bin {
@@ -66,13 +67,14 @@ model Task {
 
 model Feedback {
   content   String
-  id        String @id @default(uuid())
-  author    User   @relation(fields: [authorId], references: [id])
+  id        String    @id @default(uuid())
+  author    User      @relation(fields: [authorId], references: [id])
   authorId  String
-  likers    User[] @relation("likedFeedbacks")
-  dislikers User[] @relation("dislikedFeedbacks")
-  likes     Int    @default(0)
-  dislikes  Int    @default(0)
+  likers    User[]    @relation("likedFeedbacks")
+  dislikers User[]    @relation("dislikedFeedbacks")
+  likes     Int       @default(0)
+  dislikes  Int       @default(0)
+  comments  Comment[]
 }
 
 model Notification {
@@ -82,6 +84,16 @@ model Notification {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
   userId    String
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  content    String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  feedback   Feedback @relation(fields: [feedbackId], references: [id])
+  feedbackId String
 }
 
 enum TaskStatus {

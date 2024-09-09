@@ -10,35 +10,35 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object,do
         }
     }>,reply:FastifyReply)=>{
         try {
-            if(req.query.p){
-                let feedbacks = await prisma.feedback.findMany({
-                    take:10,
-                    skip:(req.query.p - 1) * 10,
-                    include:{
-                        author:true
-                    }
-                })
-                let token = sign({feedbacks},process.env.SECRET_KEY)
-                reply.code(200).send({token})
-            }else{
-                let feedbacks = await prisma.feedback.findMany({
-                    include:{
-                        author:{
-                            select:{
-                                email:true,
-                                firstName:true,
-                                lastName:true,
-                                avatar:true,
-                                isLoggedIn:true,
-                                birthday:true,
-                                id:true
-                            }
+            let foundFeedbacks = await prisma.feedback.findMany({
+                include:{
+                    author:{
+                        select:{
+                            email:true,
+                            firstName:true,
+                            lastName:true,
+                            avatar:true,
+                            isLoggedIn:true,
+                            birthday:true,
                         }
                     }
-                });
-                let token = sign({feedbacks},process.env.SECRET_KEY)
-                reply.code(200).send({token})
+                }
+            });
+            let feedbacks:object[] = [];
+            for (const element of foundFeedbacks) {
+                let commentsCount = await prisma.comment.findMany({
+                    where:{
+                        feedbackId:element.id
+                    }
+                })
+                let feedbackObject = {
+                    ...element,
+                    commentsCount:commentsCount.length
+                }
+                feedbacks.push(feedbackObject);
             }
+            let token = sign({feedbacks},process.env.SECRET_KEY)
+            reply.code(200).send({token})
         } catch (error) {
             console.log(error);
         }
@@ -68,8 +68,15 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object,do
                         }
                     }
                 })
-                let token = sign({feedback},process.env.SECRET_KEY)
-                reply.code(200).send({token})
+                if(feedback){
+                    let comments = await prisma.comment.findMany({
+                        where:{
+                            feedbackId:req.params.id
+                        }
+                    })
+                    let token = sign({feedback:{...feedback,commentsCount:comments.length}},process.env.SECRET_KEY)
+                    reply.code(200).send({token})
+                }
             }
         } catch (error) {
             console.log(error);
@@ -90,51 +97,38 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object,do
                     }
                 })
                 if(user){
-                    if(req.query.p){
-                        let feedbacks = await prisma.feedback.findMany({
-                            where:{
-                                authorId:user.id
-                            },
-                            take:10,
-                            skip:(Number(req.query.p) - 1) * 10,
-                            include:{
-                                author:{
-                                    select:{
-                                        email:true,
-                                        firstName:true,
-                                        lastName:true,
-                                        avatar:true,
-                                        isLoggedIn:true,
-                                        birthday:true,
-                                    }
+                    let foundFeedbacks = await prisma.feedback.findMany({
+                        where:{
+                            authorId:user.id
+                        },
+                        include:{
+                            author:{
+                                select:{
+                                    email:true,
+                                    firstName:true,
+                                    lastName:true,
+                                    avatar:true,
+                                    isLoggedIn:true,
+                                    birthday:true,
                                 }
+                            }
+                        }
+                    });
+                    let feedbacks:object[] = [];
+                    for (const element of foundFeedbacks) {
+                        let commentsCount = await prisma.comment.count({
+                            where:{
+                                feedbackId:element.id
                             }
                         })
-                        console.log(feedbacks);
-                        let token = sign({feedbacks},process.env.SECRET_KEY)
-                        reply.code(200).send({token})
-                    }else{
-                        let feedbacks = await prisma.feedback.findMany({
-                            where:{
-                                authorId:user.id
-                            },
-                            include:{
-                                author:{
-                                    select:{
-                                        email:true,
-                                        firstName:true,
-                                        lastName:true,
-                                        avatar:true,
-                                        isLoggedIn:true,
-                                        birthday:true,
-                                    }
-                                }
-                            }
-                        });
-                        console.log(feedbacks);
-                        let token = sign({feedbacks},process.env.SECRET_KEY)
-                        reply.code(200).send({token})
+                        let feedbackObject = {
+                            ...element,
+                            commentsCount
+                        }
+                        feedbacks.push(feedbackObject);
                     }
+                    let token = sign({feedbacks},process.env.SECRET_KEY)
+                    reply.code(200).send({token})
                 }else{
                     let token = sign({error:"OOPS !! you don't have the permission to access this resource"},process.env.SECRET_KEY)
                     reply.code(401).send({token})
@@ -342,7 +336,6 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object,do
                         });
                         reply.send({ token: sign({ data: { likes: updatedFeedback.likes, dislikes: updatedFeedback.dislikes } }, process.env.SECRET_KEY) });
                     } else {
-                        // If the user hasn't liked or disliked yet, add the dislike
                         const updatedFeedback = await prisma.feedback.update({
                             where: { id: feedbackId },
                             data: {

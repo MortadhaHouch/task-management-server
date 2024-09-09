@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import feedbackRouter from "./routes/feedbackRouter";
 import notificationsRouter from "./routes/notificationsRouter";
+import { commentRouter } from "./routes/commentRouter";
 require("dotenv").config();
 let cors = require("@fastify/cors")
 const pino = require('pino')
@@ -39,6 +40,7 @@ Fastify.register(userRouter,{prefix:"/user"})
 Fastify.register(taskRouter,{prefix:"/task"})
 Fastify.register(feedbackRouter,{prefix:"/feedback"})
 Fastify.register(notificationsRouter,{prefix:"/notifications"})
+Fastify.register(commentRouter,{prefix:"/comment"})
 async function main(){
     Fastify.listen({
         port:Number(process.env.PORT),
