@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient,User } from '@prisma/client';
 let prisma = new PrismaClient();
 let {verify,sign} = require("jsonwebtoken");
 require("dotenv").config();
@@ -268,7 +268,7 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object,do
                         where: { id: feedbackId },
                         include: { likers: true, dislikers: true }
                     });
-                    if (feedback?.likers.some(liker => liker.id === user.id)) {
+                    if (feedback?.likers.some((liker:User) => liker.id === user.id)) {
                         const updatedFeedback = await prisma.feedback.update({
                             where: { id: feedbackId },
                             data: {
@@ -277,7 +277,7 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object,do
                             }
                         });
                         reply.send({ token: sign({ data: { likes: updatedFeedback.likes, dislikes: updatedFeedback.dislikes } }, process.env.SECRET_KEY) });
-                    } else if (feedback?.dislikers.some(disliker => disliker.id === user.id)) {
+                    } else if (feedback?.dislikers.some((disliker:User) => disliker.id === user.id)) {
                         const updatedFeedback = await prisma.feedback.update({
                             where: { id: feedbackId },
                             data: {
@@ -321,7 +321,7 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object,do
                         where: { id: feedbackId },
                         include: { likers: true, dislikers: true }
                     });
-                    if (feedback?.dislikers.some(disliker => disliker.id === user.id)) {
+                    if (feedback?.dislikers.some((disliker:User) => disliker.id === user.id)) {
                         const updatedFeedback = await prisma.feedback.update({
                             where: { id: feedbackId },
                             data: {
@@ -330,7 +330,7 @@ export default function feedbackRouter(fastify:FastifyInstance,options:object,do
                             }
                         });
                         reply.send({ token: sign({ data: { likes: updatedFeedback.likes, dislikes: updatedFeedback.dislikes } }, process.env.SECRET_KEY) });
-                    } else if (feedback?.likers.some(liker => liker.id === user.id)) {
+                    } else if (feedback?.likers.some((liker:User) => liker.id === user.id)) {
                         const updatedFeedback = await prisma.feedback.update({
                             where: { id: feedbackId },
                             data: {
