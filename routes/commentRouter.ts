@@ -1,198 +1,128 @@
-import {FastifyInstance,FastifyRequest,FastifyReply} from "fastify"
-let {verify,sign} = require("jsonwebtoken");
-require("dotenv").config()
-import {PrismaClient} from "@prisma/client"
-let prisma:PrismaClient = new PrismaClient()
-export function commentRouter(fastify:FastifyInstance,options:object,done:Function){
-    fastify.get("/:id",async(req:FastifyRequest<{
-        Params:{
-            id:string
-        }
-    }>,reply:FastifyReply)=>{
+import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { verify } from "jsonwebtoken";
+import { PrismaClient } from "@prisma/client";
+require("dotenv").config();
+
+const prisma = new PrismaClient();
+
+export function commentRouter(fastify: FastifyInstance, options: object, done: Function) {
+    const verifyUser = async (cookie: string | undefined) => {
+        if (!cookie) return null;
         try {
-            if(req.params.id){
-                let comments = await prisma.comment.findMany({
-                    where:{
-                        feedbackId:req.params.id
-                    },
-                    select:{
-                        id:true,
-                        content:true,
-                        createdAt:true,
-                        user:{
-                            select:{
-                                firstName:true,
-                                lastName:true,
-                                email:true,
-                                avatar:true,
-                            }
+            const { email } = verify(cookie, process.env.SECRET_KEY as string) as { email: string };
+            return await prisma.user.findUnique({ where: { email } });
+        } catch {
+            return null;
+        }
+    };
+
+    fastify.get("/:id/:p?", async (req: FastifyRequest<{ Params: { id: string, p?: string } }>, reply: FastifyReply) => {
+        try {
+            const { id, p } = req.params;
+            const page = Number(p) || 1;
+            const take = 10;
+            const skip = (page - 1) * take;
+
+            const totalComments = await prisma.comment.count({ where: { feedbackId: id } });
+            const comments = await prisma.comment.findMany({
+                where: { feedbackId: id },
+                select: {
+                    id: true,
+                    content: true,
+                    createdAt: true,
+                    user: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                            avatar: true,
                         }
-                    },
-                })
-                let token = sign({comments},process.env.SECRET_KEY)
-                reply.code(200).send({token})
-            }
-        } catch (error) {
-            console.log(error);
-        }
-    })
-    fastify.get("/:id/:p",async(req:FastifyRequest<{
-        Params:{
-            id:string
-            p:string
-        }
-    }>,reply:FastifyReply)=>{
-        try {
-            if(req.params.id){
-                if(Number(req.params.p)){
-                    let comments = await prisma.comment.findMany({
-                        where:{
-                            feedbackId:req.params.id
-                        },
-                        select:{
-                            id:true,
-                            content:true,
-                            createdAt:true,
-                            user:{
-                                select:{
-                                    firstName:true,
-                                    lastName:true,
-                                    email:true,
-                                    avatar:true,
-                                }
-                            }
-                        },
-                        take:10,
-                        skip:(Number(req.params.p) - 1) * 10
-                    })
-                    let token = sign({comments},process.env.SECRET_KEY)
-                    reply.code(200).send({token})
-                }else{
-                    let comments = await prisma.comment.findMany({
-                        where:{
-                            feedbackId:req.params.id
-                        },
-                        select:{
-                            id:true,
-                            content:true,
-                            createdAt:true,
-                            user:{
-                                select:{
-                                    firstName:true,
-                                    lastName:true,
-                                    email:true,
-                                    avatar:true,
-                                }
-                            }
-                        },
-                    })
-                    let token = sign({comments},process.env.SECRET_KEY)
-                    reply.code(200).send({token})
-                }
-            }
-        } catch (error) {
-            console.log(error);
-        }
-    })
-    fastify.post("/create",async(req:FastifyRequest<{
-        Body:{
-            body:any
-        }
-    }>,reply:FastifyReply)=>{
-        try {
-            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
-            if(cookie && cookie.length > 0){
-                let {email} = verify(cookie,process.env.SECRET_KEY);
-                let user = await prisma.user.findUnique({
-                    where:{
-                        email
                     }
-                })
-                if(user){
-                    let {content,feedbackId} = verify(req.body.body,process.env.SECRET_KEY);
-                    let comment = await prisma.comment.create({
-                        data:{
-                            userId:user.id,
-                            content,
-                            feedbackId
-                        }
-                    })
-                    let token = sign({comment},process.env.SECRET_KEY)
-                    reply.code(201).send({token})
-                }
-            }else{
-                let token = sign({error:"unauthorized to access this resource"},process.env.SECRET_KEY)
-                reply.code(401).send({token})
-            }
+                },
+                take,
+                skip,
+                orderBy: { createdAt: 'desc' }
+            });
+
+            reply.code(200).send({
+                comments,
+                totalPages: Math.ceil(totalComments / take),
+                currentPage: page
+            });
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            reply.code(500).send({ error: "Failed to fetch comments" });
         }
-    })
-    fastify.put("/edit",async(req:FastifyRequest<{
-        Body:{
-            body:any
-        }
-    }>,reply:FastifyReply)=>{
+    });
+
+    fastify.post("/create", async (req: FastifyRequest<{ Body: { content: string, feedbackId: string } }>, reply: FastifyReply) => {
         try {
-            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
-            if(cookie && cookie.length > 0){
-                let {email} = verify(cookie,process.env.SECRET_KEY);
-                let user = await prisma.user.findUnique({
-                    where:{
-                        email
-                    }
-                })
-                if(user){
-                    let {content,id} = verify(req.body.body,process.env.SECRET_KEY);
-                    let comment = await prisma.comment.update({
-                        where:{
-                            id
-                        },
-                            data:{
-                            content,
-                        }
-                    })
-                    let token = sign({comment},process.env.SECRET_KEY)
-                    reply.code(201).send({token})
+            const user = await verifyUser(req.cookies.jwt_token);
+            if (!user) return reply.code(401).send({ error: "Unauthorized" });
+
+            const { content, feedbackId } = req.body;
+            const comment = await prisma.comment.create({
+                data: {
+                    userId: user.id,
+                    content,
+                    feedbackId
                 }
-            }else{
-                let token = sign({error:"unauthorized to access this resource"},process.env.SECRET_KEY)
-                reply.code(401).send({token})
-            }
+            });
+
+            reply.code(201).send({ comment });
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            reply.code(500).send({ error: "Failed to create comment" });
         }
-    })
-    fastify.delete("/delete/:id",async(req:FastifyRequest<{
-        Params:{
-            id:string
-        }
-    }>,reply:FastifyReply)=>{
+    });
+
+    // Edit a comment
+    fastify.put("/edit", async (req: FastifyRequest<{ Body: { content: string, id: string } }>, reply: FastifyReply) => {
         try {
-            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
-            if(cookie && cookie.length > 0){
-                let {email} = verify(cookie,process.env.SECRET_KEY);
-                let user = await prisma.user.findUnique({
-                    where:{
-                        email
-                    }
-                })
-                if(user){
-                    let comment = await prisma.comment.delete({
-                        where:{
-                            id:req.params.id
-                        }
-                    })
-                    let token = sign({message:"feedback deleted"},process.env.SECRET_KEY)
-                    reply.code(201).send({token})
-                }
-            }else{
-                let token = sign({error:"unauthorized to access this resource"},process.env.SECRET_KEY)
-                reply.code(401).send({token})
+            const user = await verifyUser(req.cookies.jwt_token);
+            if (!user) return reply.code(401).send({ error: "Unauthorized" });
+
+            const { content, id } = req.body;
+
+            // Optional: ensure the user owns the comment before editing
+            const existingComment = await prisma.comment.findUnique({ where: { id } });
+            if (!existingComment || existingComment.userId !== user.id) {
+                return reply.code(403).send({ error: "Forbidden: You can only edit your own comments" });
             }
+
+            const updatedComment = await prisma.comment.update({
+                where: { id },
+                data: { content }
+            });
+
+            reply.code(200).send({ comment: updatedComment });
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            reply.code(500).send({ error: "Failed to edit comment" });
         }
-    })
-    done()
+    });
+
+    // Delete a comment
+    fastify.delete("/delete/:id", async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+        try {
+            const user = await verifyUser(req.cookies.jwt_token);
+            if (!user) return reply.code(401).send({ error: "Unauthorized" });
+
+            const { id } = req.params;
+
+            const existingComment = await prisma.comment.findUnique({ where: { id } });
+            if (!existingComment || existingComment.userId !== user.id) {
+                return reply.code(403).send({ error: "Forbidden: You can only delete your own comments" });
+            }
+
+            await prisma.comment.delete({ where: { id } });
+
+            reply.code(200).send({ message: "Comment deleted successfully" });
+        } catch (error) {
+            console.error(error);
+            reply.code(500).send({ error: "Failed to delete comment" });
+        }
+    });
+
+    done();
 }

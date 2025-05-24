@@ -10,7 +10,7 @@ export default function notificationsRouter(fastify:FastifyInstance,options:obje
         }
     }>,reply:FastifyReply)=>{
         try {
-            let cookie = req.headers.cookie?.split(";").find((item)=>item.split("=")[0] == "jwt_token")?.split("=")[1];
+            let cookie = req.cookies.jwt_token;
             if(cookie && cookie.length > 0){
                 let {email} = verify(cookie,process.env.SECRET_KEY);
                 let user = await prisma.user.findUnique({
@@ -27,24 +27,20 @@ export default function notificationsRouter(fastify:FastifyInstance,options:obje
                             skip:(Number(req.params.p) - 1) * 10,
                             take:10
                         });
-                        let token = sign({notifications},process.env.SECRET_KEY);
-                        reply.code(200).send({token});
+                        reply.code(200).send({notifications,pagesCount:Math.floor(notifications.length/10)});
                     }else{
                         let notifications = await prisma.notification.findMany({
                             where:{
                                 userId:user.id
                             }
                         });
-                        let token = sign({notifications,pagesCount:Math.floor(notifications.length/10)},process.env.SECRET_KEY);
-                        reply.code(200).send({token});
+                        reply.code(200).send({notifications,pagesCount:Math.floor(notifications.length/10)});
                     }
                 }else{
-                    let token = sign({error:"OOPS!! invalid credentials"},process.env.SECRET_KEY);
-                    reply.send({token});
+                    reply.send({error:"OOPS!! invalid credentials"});
                 }
             }else{
-                let token = sign({error:"OOPS!! you are not logged in"},process.env.SECRET_KEY);
-                reply.send({token});
+                reply.send({error:"OOPS!! you are not logged in"});
             }
         } catch (error) {
             console.log(error);

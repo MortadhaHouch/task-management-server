@@ -40,9 +40,9 @@ type Bin = {
     tasks:Task[]
 }
 enum Status{
-    DONE,
-    ACCOMPLISHED,
-    PENDING,
+    DONE="DONE",
+    PENDING="PENDING",
+    CANCELLED="CANCELLED"
 }
 type SignupRequest = {
     firstName:string

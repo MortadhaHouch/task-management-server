@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import feedbackRouter from "./routes/feedbackRouter";
 import notificationsRouter from "./routes/notificationsRouter";
 import { commentRouter } from "./routes/commentRouter";
+import cookie, { FastifyCookieOptions } from '@fastify/cookie'
 require("dotenv").config();
 let cors = require("@fastify/cors")
 const pino = require('pino')
@@ -15,11 +16,10 @@ require("dotenv").config()
 const helmet = require('@fastify/helmet')
 let userRouter = require("./routes/userRouter")
 let taskRouter = require("./routes/taskRouter")
-Fastify.register(require('@fastify/cookie'), {
-    secret: process.env.SECRET_KEY, // for cookies signature
-    hook: 'onRequest', // set to false to disable cookie autoparsing or set autoparsing on any of the following hooks: 'onRequest', 'preParsing', 'preHandler', 'preValidation'. default: 'onRequest'
-    parseOptions: {}  // options for parsing cookies
-})
+Fastify.register(cookie, {
+  secret: process.env.SECRET_KEY, // for cookies signature
+  parseOptions: {}     // options for parsing cookies
+} as FastifyCookieOptions)
 Fastify.register(require('@fastify/postgres'), {
     connectionString: process.env.DATABASE_URL,
 });
